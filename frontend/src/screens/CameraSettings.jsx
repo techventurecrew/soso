@@ -19,26 +19,36 @@
  * @param {Object} sessionData - Current session data including selected grid
  * @returns {JSX.Element} Camera settings and capture interface
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Webcam from 'react-webcam';
-import { FallingSparkles, FloatingBubbles, FallingHearts, ConfettiRain, TwinklingStars } from '../components/Decoration';
+import { FallingHearts } from '../components/Decoration';
+import { createGridComposite } from '../utils/imageComposite';
+import CameraPipeline from '../pipeline/cameraPipeline';
 
 function CameraSettings({ updateSession, sessionData }) {
   const navigate = useNavigate();
 
   // Image adjustment states: Real-time adjustment values
-  const [brightness, setBrightness] = useState(1); // Brightness multiplier (0.5-2)
-  const [contrast, setContrast] = useState(1); // Contrast multiplier (0.5-2)
-  const [saturation, setSaturation] = useState(1); // Color saturation (0-2)
-  const [sharpness, setSharpness] = useState(0); // Sharpness level (0-5, inverted as blur)
-  const [autoCapture, setAutoCapture] = useState(false); // Auto-capture toggle
-  const [faceDetected, setFaceDetected] = useState(false); // Face detection status
+  const savedCameraSettings = sessionData?.cameraSettings || {};
+  const [brightness, setBrightness] = useState(savedCameraSettings.brightness ?? 1); // Brightness multiplier (0.5-2)
+  const [contrast, setContrast] = useState(savedCameraSettings.contrast ?? 1); // Contrast multiplier (0.5-2)
+  const [saturation, setSaturation] = useState(savedCameraSettings.saturation ?? 1); // Color saturation (0-2)
+  const [sharpness, setSharpness] = useState(savedCameraSettings.sharpness ?? 0); // Sharpness level (0-5)
+  const [autoCapture, setAutoCapture] = useState(savedCameraSettings.autoCapture ?? false); // Auto-capture toggle
   const [capturedPhotos, setCapturedPhotos] = useState([]); // Array of captured photo data URLs
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0); // Current photo index for grid layouts
   const [hoveredPhotoIndex, setHoveredPhotoIndex] = useState(null); // Track hovered photo for delete button
-  const webcamRef = useRef(null); // Reference to webcam component
-  const canvasRef = useRef(null); // Reference to canvas for face detection
+  const videoRef = useRef(null); // Video element for camera pipeline
+  const previewCanvasRef = useRef(null); // Canvas displaying filtered output
+  const pipelineRef = useRef(null);
+  const pipelineBootedRef = useRef(false);
+  const [pipelineReady, setPipelineReady] = useState(false);
+  const [pipelineError, setPipelineError] = useState(null);
+  const cameraFilterName = sessionData?.cameraFilter || 'smoothSkin';
+  const sessionBrightnessMultiplier = useMemo(
+    () => (sessionData?.brightness || 100) / 100,
+    [sessionData?.brightness]
+  );
 
   /**
    * Calculate total number of cells needed based on selected grid layout
@@ -98,136 +108,117 @@ function CameraSettings({ updateSession, sessionData }) {
     });
   }, [sessionData?.selectedGrid, totalCells]);
 
-  // Simple face detection using canvas-based approach
+  const initialFilterRef = useRef(cameraFilterName);
+
   useEffect(() => {
-    const detectFace = async () => {
-      if (!webcamRef.current) return;
+    if (pipelineBootedRef.current) return;
+    if (!videoRef.current || !previewCanvasRef.current) return;
 
-      const interval = setInterval(async () => {
-        try {
-          const imageSrc = webcamRef.current?.getScreenshot();
-          if (!imageSrc) return;
+    pipelineBootedRef.current = true;
 
-          const img = new Image();
-          img.src = imageSrc;
-          img.onload = () => {
-            const canvas = canvasRef.current || document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
+    const pipeline = new CameraPipeline({
+      videoEl: videoRef.current,
+      outputCanvas: previewCanvasRef.current,
+      defaultFilter: initialFilterRef.current,
+      enableFaceDetection: true,
+    });
 
-            // Simple brightness-based face detection
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-            let facePixels = 0;
+    pipelineRef.current = pipeline;
 
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
-              // Detect skin tone range (simplified)
-              if (r > 95 && g > 40 && b > 20 && r > g && r > b) {
-                facePixels++;
-              }
-            }
+    pipeline
+      .start()
+      .then(() => {
+        setPipelineReady(true);
+        setPipelineError(null);
+      })
+      .catch((error) => {
+        console.error('Failed to start camera pipeline', error);
+        setPipelineError(error?.message || 'Unable to access camera');
+      });
 
-            const faceRatio = facePixels / (canvas.width * canvas.height);
-            setFaceDetected(faceRatio > 0.05);
-          };
-        } catch (err) {
-          // Silently handle detection errors
-        }
-      }, 500);
-
-      return () => clearInterval(interval);
+    return () => {
+      pipeline.stop();
     };
+  }, []);
 
-    if (autoCapture && !isComplete) {
-      detectFace();
-    }
-  }, [autoCapture, isComplete]);
+  useEffect(() => {
+    if (!pipelineRef.current) return;
+    pipelineRef.current.setFilter(cameraFilterName);
+  }, [cameraFilterName]);
+
+  useEffect(() => {
+    if (!pipelineRef.current) return;
+    pipelineRef.current.setAdjustments({
+      brightness: sessionBrightnessMultiplier * parseFloat(brightness),
+      contrast: parseFloat(contrast),
+      saturation: parseFloat(saturation),
+      sharpness: parseFloat(sharpness),
+    });
+  }, [brightness, contrast, saturation, sharpness, sessionBrightnessMultiplier]);
 
   const apply = () => {
     updateSession({ cameraSettings: { brightness: parseFloat(brightness), contrast: parseFloat(contrast), saturation: parseFloat(saturation), sharpness: parseFloat(sharpness), autoCapture } });
     navigate('/camera-filter');
   };
 
-  // Get camera filter from session data (set in CameraFilter.jsx)
-  const getCameraFilter = () => {
-    const filterStyles = {
-      none: 'none',
-      sepia: 'sepia(0.6)',
-      vintage: 'sepia(0.4) contrast(0.9) saturate(0.8)',
-      cool: 'hue-rotate(200deg) saturate(1.1)',
-      mono: 'grayscale(1)',
-    };
-    const cameraFilter = sessionData?.cameraFilter || 'none';
-    const cameraBrightness = sessionData?.brightness || 100;
-    const baseFilter = filterStyles[cameraFilter];
-    // Convert percentage brightness to multiplier (100% = 1.0)
-    const cameraBrightnessMultiplier = cameraBrightness / 100;
-    // Combine with camera settings brightness (multiply them)
-    const combinedBrightness = cameraBrightnessMultiplier * parseFloat(brightness);
+  const finalizeCaptureSession = async (photos) => {
+    const grid = sessionData?.selectedGrid || { cols: 1, rows: 1, id: '4x6-single' };
+    const finalPhotos = [...photos];
+    let compositeImage = null;
 
-    // Build filter string with base filter and combined brightness
-    let filterParts = [];
-    if (baseFilter !== 'none') {
-      filterParts.push(baseFilter);
+    if (finalPhotos.length === 1) {
+      compositeImage = finalPhotos[0];
+    } else {
+      try {
+        compositeImage = await createGridComposite(finalPhotos, grid, 300, 0);
+        console.log('Composite image created successfully (CameraSettings)');
+      } catch (error) {
+        console.error('Error creating composite in CameraSettings:', error);
+      }
     }
-    filterParts.push(`brightness(${combinedBrightness})`);
-    filterParts.push(`contrast(${contrast})`);
-    filterParts.push(`saturate(${saturation})`);
 
-    return filterParts.join(' ');
-  };
-
-  // Combine camera filter with camera settings for preview and capture
-  const getCombinedFilter = () => {
-    return getCameraFilter();
+    updateSession({
+      capturedPhotos: finalPhotos,
+      editedPhotos: finalPhotos,
+      compositeImage: compositeImage || finalPhotos[0],
+      selectedGrid: grid
+    });
+    navigate('/frame-selection');
   };
 
   const handleCapture = async () => {
-    const settings = { brightness: parseFloat(brightness), contrast: parseFloat(contrast), saturation: parseFloat(saturation), sharpness: parseFloat(sharpness), autoCapture };
+    const settings = {
+      brightness: parseFloat(brightness),
+      contrast: parseFloat(contrast),
+      saturation: parseFloat(saturation),
+      sharpness: parseFloat(sharpness),
+      autoCapture
+    };
     updateSession({ cameraSettings: settings });
 
-    try {
-      const imageSrc = webcamRef.current?.getScreenshot();
-      if (!imageSrc) return;
+    const pipeline = pipelineRef.current;
+    if (!pipeline) {
+      console.warn('Camera pipeline not ready');
+      return;
+    }
 
-      const img = new Image();
-      img.src = imageSrc;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const w = img.width;
-        const h = img.height;
+    const photoData = pipeline.capturePhoto({ quality: 0.95 });
+    if (!photoData) {
+      console.error('Failed to capture photo from pipeline');
+      return;
+    }
 
-        canvas.width = w;
-        canvas.height = h;
-        // Apply both camera filter and camera settings
-        ctx.filter = getCombinedFilter();
-        ctx.drawImage(img, 0, 0);
+    const newPhotos = [...capturedPhotos, photoData];
+    setCapturedPhotos(newPhotos);
 
-        const photoData = canvas.toDataURL('image/jpeg', 0.95);
-        const newPhotos = [...capturedPhotos, photoData];
-        setCapturedPhotos(newPhotos);
+    const nextIndex = newPhotos.length;
+    setCurrentPhotoIndex(nextIndex);
 
-        // Update photo index to reflect next photo to capture
-        const nextIndex = newPhotos.length;
-        setCurrentPhotoIndex(nextIndex);
-
-        // If all photos captured, save and proceed
-        if (newPhotos.length === totalCells) {
-          updateSession({ capturedPhotos: newPhotos });
-          // Small delay to show completion, then navigate
-          setTimeout(() => {
-            navigate('/edit');
-          }, 500);
-        }
-      };
-    } catch (err) {
-      console.error('Capture failed', err);
+    if (newPhotos.length === totalCells) {
+      updateSession({ capturedPhotos: newPhotos });
+      setTimeout(() => {
+        finalizeCaptureSession(newPhotos);
+      }, 500);
     }
   };
 
@@ -241,8 +232,6 @@ function CameraSettings({ updateSession, sessionData }) {
     setCurrentPhotoIndex(updatedPhotos.length);
     setHoveredPhotoIndex(null);
   };
-
-  const filter = getCombinedFilter();
 
   return (
     <div style={{ background: "#f6DDD8", height: "100vh", overflow: "hidden" }} className="w-screen h-screen flex items-center justify-center overflow-hidden">
@@ -311,20 +300,25 @@ function CameraSettings({ updateSession, sessionData }) {
 
           <div className="flex flex-col">
             <h3 className="font-semibold text-md text-center mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Preview</h3>
-            <div className="bg-gray-900 rounded-lg overflow-hidden p-1 flex-1 flex items-center justify-center">
-              <Webcam
-                ref={webcamRef}
-                audio={false}
-                screenshotFormat="image/jpeg"
-                videoConstraints={{
-                  facingMode: 'user',
-                  height: { ideal: 1280 },
-                  width: { ideal: 720 }
-                }}
-                style={{ width: '100%', height: '100%', objectFit: 'contain', filter: filter }}
+            <div className="bg-gray-900 rounded-lg overflow-hidden p-1 flex-1 flex items-center justify-center relative">
+              <canvas
+                ref={previewCanvasRef}
+                className="w-full h-full"
+                style={{ maxWidth: '100%', maxHeight: '100%' }}
               />
+              <video ref={videoRef} className="hidden" />
+              {!pipelineReady && !pipelineError && (
+                <div className="absolute inset-0 flex items-center justify-center text-white text-sm">
+                  Initializing camera...
+                </div>
+              )}
+              {pipelineError && (
+                <div className="absolute inset-0 flex items-center justify-center text-center text-white text-xs px-4">
+                  {pipelineError}
+                </div>
+              )}
             </div>
-            <p className="text-xs text-gray-600 mt-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Real-time adjustments will apply.</p>
+            <p className="text-xs text-gray-600 mt-1" style={{ fontFamily: "'Poppins', sans-serif" }}>Canvas filters are applied live and will match your captured photos.</p>
 
             {/* Capture status message */}
             {!isComplete && (
@@ -357,11 +351,13 @@ function CameraSettings({ updateSession, sessionData }) {
             )}
             <button
               onClick={handleCapture}
-              disabled={isComplete}
-              className={`px-4 py-2 rounded-lg font-bold text-white text-sm ${isComplete ? 'bg-gray-400 cursor-not-allowed' : 'bg-rose-500 hover:bg-rose-600 shadow-lg'}`}
+              disabled={isComplete || !pipelineReady}
+              className={`px-4 py-2 rounded-lg font-bold text-white text-sm ${
+                isComplete || !pipelineReady ? 'bg-gray-400 cursor-not-allowed' : 'bg-rose-500 hover:bg-rose-600 shadow-lg'
+              }`}
               style={{ fontFamily: "'Poppins', sans-serif" }}
             >
-              {isComplete ? 'Complete ✓' : `📸 Capture Photo ${capturedPhotos.length + 1}/${totalCells}`}
+              {isComplete ? 'Complete ✓' : !pipelineReady ? 'Starting camera…' : `📸 Capture Photo ${capturedPhotos.length + 1}/${totalCells}`}
             </button>
           </div>
         </div>

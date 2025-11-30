@@ -209,7 +209,7 @@ function FrameSelectionScreen({ sessionData, updateSession }) {
 
                     <div className="mt-4 flex gap-2 flex-shrink-0">
                         <button
-                            onClick={() => navigate('/edit')}
+                            onClick={() => navigate('/camera')}
                             className="flex-1 text-sm py-2 px-3 rounded-lg border-2 hover:bg-gray-100 font-semibold"
                             style={{ fontFamily: "'Poppins', sans-serif" }}
                             disabled={isProcessing}

@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import { FallingSparkles, FloatingBubbles, FallingHearts, ConfettiRain, TwinklingStars } from '../components/Decoration';
+import { createGridComposite } from '../utils/imageComposite';
 
 function CameraScreen({ sessionData, updateSession }) {
   const navigate = useNavigate();
@@ -159,18 +160,37 @@ function CameraScreen({ sessionData, updateSession }) {
     setCountdown(null);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     const grid = sessionData.selectedGrid || { cols: 1, rows: 1 };
     // Strip-grid needs 4 photos (1 column × 4 rows, will be duplicated in composite)
     const isStripGrid = grid.id === 'strip-grid' || grid.isStripGrid;
     const totalCells = isStripGrid ? 4 : (grid.cols * grid.rows);
-    if (capturedImages.length === totalCells) {
-      updateSession({
-        capturedPhotos: capturedImages,
-        selectedFrame: selectedFrame
-      });
-      navigate('/edit');
+    if (capturedImages.length !== totalCells) {
+      return;
     }
+
+    const finalPhotos = [...capturedImages];
+    let compositeImage = null;
+
+    if (finalPhotos.length === 1) {
+      compositeImage = finalPhotos[0];
+    } else {
+      try {
+        compositeImage = await createGridComposite(finalPhotos, grid, 300, 0);
+        console.log('Composite image created successfully');
+      } catch (error) {
+        console.error('Error creating composite:', error);
+      }
+    }
+
+    updateSession({
+      capturedPhotos: finalPhotos,
+      editedPhotos: finalPhotos,
+      compositeImage: compositeImage || finalPhotos[0],
+      selectedFrame: selectedFrame,
+      selectedGrid: grid
+    });
+    navigate('/frame-selection');
   };
 
   return (
@@ -190,7 +210,7 @@ function CameraScreen({ sessionData, updateSession }) {
               } else if (capturedImages.length === 1) {
                 return 'Review Your Photo';
               } else {
-                return 'Strike a Pose!';
+                return 'Capture Your Photos';
               }
             })()}
           </h2>
@@ -223,7 +243,7 @@ function CameraScreen({ sessionData, updateSession }) {
                   if (capturedImages.length === totalCells && totalCells > 1) {
                     // Show grid of captured images
                     return (
-                      <div className={`grid gap-2 p-2 ${frames[selectedFrame].style}`} style={{ gridTemplateColumns: `repeat(${grid.cols}, 1fr)`, gridTemplateRows: `repeat(${grid.rows}, 1fr)` }}>
+                      <div className={`grid ${frames[selectedFrame].style}`} style={{ gridTemplateColumns: `repeat(${grid.cols}, 1fr)`, gridTemplateRows: `repeat(${grid.rows}, 1fr)`, gap: '5px' }}>
                         {capturedImages.map((img, index) => (
                           <img key={index} src={img} alt={`Captured ${index + 1}`} className="w-full h-full object-cover" />
                         ))}
@@ -300,7 +320,7 @@ function CameraScreen({ sessionData, updateSession }) {
                           onClick={handleNext}
                           className="btn-primary text-sm"
                         >
-                          Next: Edit →
+                          Next: Frames →
                         </button>
                       </>
                     );

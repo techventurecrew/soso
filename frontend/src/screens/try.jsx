@@ -187,7 +187,7 @@ function EditScreen({ sessionData, updateSession }) {
         // Handle strip-grid: create composite from 4 photos
         if (isStripGrid && finalPhotos.length === 4) {
             try {
-                compositeImage = await createGridComposite(finalPhotos, grid, 300);
+                compositeImage = await createGridComposite(finalPhotos, grid, 300, 0);
                 console.log('Strip-grid composite image created successfully');
             } catch (error) {
                 console.error('Error creating strip-grid composite:', error);
@@ -195,7 +195,7 @@ function EditScreen({ sessionData, updateSession }) {
             }
         } else if (finalPhotos.length > 1 && totalCells > 1 && finalPhotos.length === totalCells) {
             try {
-                compositeImage = await createGridComposite(finalPhotos, grid, 300);
+                compositeImage = await createGridComposite(finalPhotos, grid, 300, 0);
                 console.log('Composite image created successfully');
             } catch (error) {
                 console.error('Error creating composite:', error);

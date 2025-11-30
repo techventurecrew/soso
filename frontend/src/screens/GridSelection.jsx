@@ -116,22 +116,27 @@ function GridSelection({ updateSession }) {
           PLEASE CHOOSE YOUR FAVOURITE GRID
         </h2>
 
-        {/* Grid options: 2 columns layout for 4 options (2 rows: 2-2) */}
-        <div className="grid grid-cols-2 gap-4 flex-1 overflow-y-auto overflow-x-hidden m-3"
+        {/* Grid options: All 4 options displayed horizontally in one row */}
+        <div className="flex gap-4 flex-1 overflow-hidden m-3 px-4"
           style={{
-            height: 'calc(100% - 50px)', // Adjust height to fit within the container
+            height: 'calc(100% - 120px)', // Adjust height to fit within the container
+            justifyContent: 'center',
+            alignItems: 'stretch',
           }}>
           {grids.map((grid) => (
             <button
               key={grid.id}
               onClick={() => setSelected(grid.id)}
               className={`relative rounded-2xl border-4 p-4 transition-all flex flex-col items-center ${selected === grid.id
-                ? 'border-rose-400 bg-rose-50 shadow-lg scale-105'
-                : 'border-gray-200 hover:border-rose-300 hover:bg-rose-50/50'
+                ? 'shadow-lg'
+                : 'hover:opacity-90'
                 }`}
               style={{
-                background: selected === grid.id ? '#FFF0F5' : '#FFF7EE',
-                height: '100%', // Ensure buttons fit the height of the grid container
+                background: '#FFFFFF',
+                borderColor: selected === grid.id ? '#FF69B4' : '#E5E5E5',
+                borderWidth: selected === grid.id ? '4px' : '2px',
+                flex: '1 1 0',
+                minWidth: 0,
               }}
             >
               {/* Visual grid preview: Shows layout structure */}
@@ -143,7 +148,7 @@ function GridSelection({ updateSession }) {
               <div
                 className="font-bold text-xl"
                 style={{
-                  color: selected === grid.id ? '#D83A4A' : '#6B2D9B',
+                  color: selected === grid.id ? '#8B0000' : '#666666',
                 }}
               >
                 {grid.name}
@@ -153,53 +158,31 @@ function GridSelection({ updateSession }) {
         </div>
 
         {/* Navigation buttons at bottom */}
-        <div className="flex justify-between m-3 gap-3">
-          {/* Back button: Returns to payment screen */}
-          <button
-            onClick={() => navigate('/payment')}
-            className="px-6 py-3 rounded-lg border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-100 transition-all"
-          >
-            Back
-          </button>
+        <div className="flex justify-between items-end m-3 gap-3" style={{ minHeight: '60px' }}>
+          {/* Decorative bear character with camera (bottom-left) */}
+          <div className="flex items-center">
+            <img
+              src="/images/teddy_left.png"
+              alt="teddy bear with camera"
+              style={{ width: 120, height: 'auto', zIndex: 1 }}
+            />
+          </div>
 
-          {/* Continue button: Proceeds to next step with selected grid */}
+          {/* Continue button: Proceeds to next step with selected grid (bottom-right) */}
           <button
             onClick={handleContinue}
-            className="px-6 py-3 rounded-lg bg-rose-400 font-bold text-white hover:bg-rose-500 shadow-lg transition-all"
+            className="px-8 py-3 rounded-lg font-bold text-white shadow-lg transition-all"
+            style={{
+              background: '#FF69B4',
+              border: 'none',
+            }}
+            onMouseEnter={(e) => e.target.style.background = '#FF1493'}
+            onMouseLeave={(e) => e.target.style.background = '#FF69B4'}
           >
             Continue
           </button>
         </div>
 
-        {/* Decorative bear character with camera (bottom-left) */}
-        <img
-          src="/images/teddy_left.png"
-          alt="teddy bear with camera"
-          className="absolute"
-          style={{ left: 10, bottom: 90, width: 120, height: 'auto', zIndex: 1 }}
-        />
-
-        {/* Decorative hearts (bottom-right) */}
-        <div className="absolute" style={{ right: 20, bottom: 20, zIndex: 1 }}>
-          <img
-            src="/images/heart1-r.png"
-            alt="heart"
-            className="absolute"
-            style={{ bottom: 0, right: 0, width: 24, zIndex: 1 }}
-          />
-          <img
-            src="/images/heart2.png"
-            alt="heart"
-            className="absolute"
-            style={{ bottom: 20, right: 15, width: 20 }}
-          />
-          <img
-            src="/images/heart1-r.png"
-            alt="heart"
-            className="absolute"
-            style={{ bottom: 40, right: 30, width: 28 }}
-          />
-        </div>
       </div>
     </div >
   );

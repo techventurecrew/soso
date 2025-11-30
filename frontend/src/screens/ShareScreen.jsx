@@ -134,7 +134,7 @@ function ShareScreen({ sessionData, updateSession }) {
   useEffect(() => {
     // Redirect to edit screen if no photos available
     if (!editedPhotos || editedPhotos.length === 0) {
-      navigate('/edit');
+      navigate('/camera');
       return;
     }
 

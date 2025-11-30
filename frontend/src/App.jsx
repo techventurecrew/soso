@@ -8,7 +8,6 @@ import GridSelection from './screens/GridSelection';
 import CameraFilter from './screens/CameraFilter';
 import CameraSettings from './screens/CameraSettings';
 import CameraScreen from './screens/CameraScreen';
-import EditScreen from './screens/EditScreen';
 import ShareScreen from './screens/ShareScreen';
 import ThankYou from './screens/ThankYou';
 import PaymentQR from './screens/PaymentQR';
@@ -38,7 +37,7 @@ function App() {
           <Route path="/payment" element={<Page2 />} />
           <Route path="/cash-password" element={<CashPassword updateSession={updateSession} />} />
           <Route path="/grid" element={<GridSelection updateSession={updateSession} />} />
-          <Route path="/camera-filter" element={<CameraFilter updateSession={updateSession} />} />
+          <Route path="/camera-filter" element={<CameraFilter sessionData={sessionData} updateSession={updateSession} />} />
           <Route
             path="/frame-selection"
             element={<FrameSelectionScreen sessionData={sessionData} updateSession={updateSession} />}
@@ -53,7 +52,6 @@ function App() {
           <Route path="/payment-qr" element={<PaymentQR sessionData={sessionData} updateSession={updateSession} />} />
           <Route path="/camera" element={<CameraScreen sessionData={sessionData} updateSession={updateSession} />} />
           <Route path="/thankyou" element={<ThankYou />} />
-          <Route path="/edit" element={<EditScreen sessionData={sessionData} updateSession={updateSession} />} />
           <Route path="/share" element={<ShareScreen sessionData={sessionData} updateSession={updateSession} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

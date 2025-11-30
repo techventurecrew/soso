@@ -277,7 +277,8 @@ export async function createGridComposite(photos, grid, dpi = 300, marginPercent
   // Auto-calculate maxCellWidth if not provided
   if (maxCellWidth === null) {
     // Calculate cell size based on page dimensions and grid layout
-    const marginInches = 0.1; // 0.1 inch margin between cells
+    // No margins when marginPercent is 0
+    const marginInches = marginPercent > 0 ? 0.1 : 0;
     const availableWidth = pageConfig.widthInches - (marginInches * (grid.cols - 1));
     const availableHeight = pageConfig.heightInches - (marginInches * (grid.rows - 1));
     maxCellWidth = Math.min(availableWidth / grid.cols, availableHeight / grid.rows);
@@ -341,14 +342,14 @@ export async function createGridComposite(photos, grid, dpi = 300, marginPercent
     const cellWidthPx = Math.round(maxCellWidthInches * dpi);
     const cellHeightPx = Math.round(maxCellHeightInches * dpi);
 
-    // Calculate margin in pixels
-    const marginSize = Math.round(Math.min(cellWidthPx, cellHeightPx) * (marginPercent / 100));
+    // Fixed 5px gap between images
+    const gapSize = 5;
 
     // Calculate total canvas size using grid dimensions
-    // Total width = left margin + (cell width + margin) * cols + right margin
-    // Total height = top margin + (cell height + margin) * rows + bottom margin
-    const canvasWidth = marginSize + (cellWidthPx + marginSize) * grid.cols;
-    const canvasHeight = marginSize + (cellHeightPx + marginSize) * grid.rows;
+    // Total width = left gap + (cell width + gap) * (cols - 1) + cell width + right gap
+    // Total height = top gap + (cell height + gap) * (rows - 1) + cell height + bottom gap
+    const canvasWidth = gapSize + (cellWidthPx + gapSize) * (grid.cols - 1) + cellWidthPx + gapSize;
+    const canvasHeight = gapSize + (cellHeightPx + gapSize) * (grid.rows - 1) + cellHeightPx + gapSize;
 
     // Create canvas with calculated dimensions
     const canvas = document.createElement('canvas');
@@ -366,37 +367,39 @@ export async function createGridComposite(photos, grid, dpi = 300, marginPercent
       const row = index % grid.rows;
       const col = Math.floor(index / grid.rows);
 
-      // Calculate cell position
-      const cellX = marginSize + col * (cellWidthPx + marginSize);
-      const cellY = marginSize + row * (cellHeightPx + marginSize);
+      // Calculate cell position with 5px gaps
+      const cellX = gapSize + col * (cellWidthPx + gapSize);
+      const cellY = gapSize + row * (cellHeightPx + gapSize);
 
-      // Calculate scaled dimensions to fit in cell while maintaining aspect ratio
-      // and avoiding cropping
+      // Calculate scaled dimensions to fill cell completely (cover style)
+      // This ensures no gaps between images - images will fill entire cell edge-to-edge
       const imgAspect = img.width / img.height;
       const cellAspect = cellWidthPx / cellHeightPx;
 
-      let drawWidth, drawHeight, drawX, drawY;
+      // Calculate scale to cover entire cell (use larger scale factor)
+      const scaleX = cellWidthPx / img.width;
+      const scaleY = cellHeightPx / img.height;
+      const scale = Math.max(scaleX, scaleY); // Use larger scale to ensure cell is filled
 
-      if (imgAspect > cellAspect) {
-        // Image is wider relative to cell - fit to width
-        drawWidth = cellWidthPx;
-        drawHeight = cellWidthPx / imgAspect;
-        drawX = cellX;
-        drawY = cellY + (cellHeightPx - drawHeight) / 2; // Center vertically
-      } else {
-        // Image is taller relative to cell - fit to height
-        drawHeight = cellHeightPx;
-        drawWidth = cellHeightPx * imgAspect;
-        drawX = cellX + (cellWidthPx - drawWidth) / 2; // Center horizontally
-        drawY = cellY;
-      }
+      // Calculate destination dimensions (will fill cell completely)
+      const drawWidth = img.width * scale;
+      const drawHeight = img.height * scale;
+      
+      // Center the image in the cell (will crop excess)
+      const drawX = cellX + (cellWidthPx - drawWidth) / 2;
+      const drawY = cellY + (cellHeightPx - drawHeight) / 2;
 
-      // Draw full image (no cropping)
+      // Clip to cell boundaries and draw image
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(cellX, cellY, cellWidthPx, cellHeightPx);
+      ctx.clip();
       ctx.drawImage(
         img,
-        0, 0, img.width, img.height,              // source (full image)
-        drawX, drawY, drawWidth, drawHeight       // destination (scaled to fit)
+        0, 0, img.width, img.height,
+        drawX, drawY, drawWidth, drawHeight
       );
+      ctx.restore();
     });
 
     // Return composite as base64 data URL

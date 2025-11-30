@@ -1,31 +1,61 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Webcam from 'react-webcam';
-import { FallingSparkles, FloatingBubbles, FallingHearts, ConfettiRain, TwinklingStars } from '../components/Decoration';
+import { FallingHearts } from '../components/Decoration';
+import CameraPipeline from '../pipeline/cameraPipeline';
+import { filterOptions } from '../filters/main';
 import './CameraFilter.css'; // Add this import for custom fonts
 
-function CameraFilter({ updateSession }) {
-  const [filter, setFilter] = useState('none');
-  const [brightness, setBrightness] = useState(100);
+function CameraFilter({ sessionData = {}, updateSession }) {
   const navigate = useNavigate();
+  const [filter, setFilter] = useState(sessionData.cameraFilter || 'smoothSkin');
+  const [brightness, setBrightness] = useState(sessionData.brightness || 100);
+  const [pipelineError, setPipelineError] = useState(null);
+  const [pipelineReady, setPipelineReady] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const pipelineRef = useRef(null);
+
+  useEffect(() => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const pipeline = new CameraPipeline({
+      videoEl: videoRef.current,
+      outputCanvas: canvasRef.current,
+      defaultFilter: sessionData.cameraFilter || filter,
+      enableFaceDetection: false, // preview only needs filters
+      adjustments: { brightness: (sessionData.brightness || brightness) / 100 },
+    });
+
+    pipelineRef.current = pipeline;
+
+    pipeline
+      .start()
+      .then(() => {
+        setPipelineReady(true);
+        setPipelineError(null);
+      })
+      .catch((error) => {
+        console.error('Failed to start camera pipeline', error);
+        setPipelineError(error?.message || 'Unable to start camera preview');
+      });
+
+    return () => {
+      pipeline.stop();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    pipelineRef.current?.setFilter(filter);
+  }, [filter]);
+
+  useEffect(() => {
+    pipelineRef.current?.setAdjustments({ brightness: brightness / 100 });
+  }, [brightness]);
 
   const apply = () => {
     updateSession({ cameraFilter: filter, brightness });
     navigate('/camera-settings');
-  };
-
-  const filterStyles = {
-    none: 'none',
-    sepia: 'sepia(0.6)',
-    vintage: 'sepia(0.4) contrast(0.9) saturate(0.8)',
-    cool: 'hue-rotate(200deg) saturate(1.1)',
-    mono: 'grayscale(1)',
-  };
-
-  const getCombinedFilter = () => {
-    const baseFilter = filterStyles[filter];
-    const brightnessFilter = `brightness(${brightness}%)`;
-    return baseFilter === 'none' ? brightnessFilter : `${baseFilter} ${brightnessFilter}`;
   };
 
   return (
@@ -75,21 +105,25 @@ function CameraFilter({ updateSession }) {
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* <h3 className="font-semibold text-sm mb-1">Preview</h3> */}
             <div
-              style={{
-                backgroundColor: "#f6DDD8"
-              }}
-              className="rounded-lg overflow-hidden  flex-1 flex items-center justify-center">
-              <Webcam
-                audio={false}
-                screenshotFormat="image/jpeg"
-                videoConstraints={{ facingMode: 'user', height: { ideal: 1280 }, width: { ideal: 720 } }}
-                style={{
-                  width: '80%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  filter: getCombinedFilter()
-                }}
+              className="rounded-lg overflow-hidden flex-1 flex items-center justify-center relative bg-gray-900"
+              style={{ backgroundColor: '#0f0f0f' }}
+            >
+              <canvas
+                ref={canvasRef}
+                className="w-full h-full"
+                style={{ maxWidth: '80%', maxHeight: '100%' }}
               />
+              <video ref={videoRef} className="hidden" />
+              {!pipelineReady && !pipelineError && (
+                <div className="absolute inset-0 flex items-center justify-center text-white text-sm">
+                  Initializing camera...
+                </div>
+              )}
+              {pipelineError && (
+                <div className="absolute inset-0 flex items-center justify-center text-center text-white text-xs px-4">
+                  {pipelineError}
+                </div>
+              )}
             </div>
 
             {/* Buttons centered below preview */}
@@ -103,19 +137,20 @@ function CameraFilter({ updateSession }) {
           {/* Filters Section - Right Side */}
           <div className="w-64 flex flex-col gap-3">
             <h3 className="font-extrabold text-lg text-center" style={{ fontFamily: "'Quicksand', sans-serif" }}>Filters</h3>
-            <div className="flex flex-col  gap-3 overflow-x-auto">
-              {Object.keys(filterStyles).map(key => (
+            <div className="flex flex-col gap-3 overflow-x-auto">
+              {filterOptions.map(({ id, label }) => (
                 <button
-                  key={key}
-                  onClick={() => setFilter(key)}
-                  className={`flex-shrink-0 p-3 rounded-lg border-2 text-sm font-semibold transition-all ${filter === key ? 'border-rose-500 bg-rose-100' : 'border-gray-200 hover:border-gray-300'}`}
+                  key={id}
+                  onClick={() => setFilter(id)}
+                  className={`flex-shrink-0 p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                    filter === id ? 'border-rose-500 bg-rose-100' : 'border-gray-200 hover:border-gray-300'
+                  }`}
                   style={{ fontFamily: "'Poppins', sans-serif" }}
                 >
-                  <div
-                    style={{ filter: filterStyles[key] }}
-                    className="w-[100%] h-16 bg-gray-900 rounded-lg "
-                  />
-                  <div className="capitalize text-xs">{key}</div>
+                  <div className="w-full h-16 bg-gray-900 rounded-lg mb-2 flex items-center justify-center text-white text-xs">
+                    Live preview
+                  </div>
+                  <div className="text-xs font-semibold">{label}</div>
                 </button>
               ))}
             </div>

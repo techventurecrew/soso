@@ -65,10 +65,17 @@ export async function loadFrames() {
  * @param {Object} options - Optional configuration
  * @param {string} options.mode - 'frame-size' (use frame dimensions) or 'composite-size' (use composite dimensions)
  * @param {string} options.alignment - 'center', 'top-left', etc. for composite positioning
+ * @param {number} options.dpi - Print resolution (default 300 DPI)
  * @returns {Promise<string>} Base64 data URL of the final merged image
  */
 export async function applyFrameToComposite(compositeImageDataUrl, frameImageSrc, options = {}) {
-  const { mode = 'composite-size', alignment = 'center' } = options;
+  const { mode = 'composite-size', alignment = 'center', dpi = 300 } = options;
+  
+  // Add extra dimensions to frame: 0.5 inches width, 0.7 inches height
+  const extraWidthInches = 0.5;
+  const extraHeightInches = 0.7;
+  const extraWidthPx = Math.round(extraWidthInches * dpi);
+  const extraHeightPx = Math.round(extraHeightInches * dpi);
   
   return new Promise((resolve, reject) => {
     const compositeImg = new Image();
@@ -87,49 +94,51 @@ export async function applyFrameToComposite(compositeImageDataUrl, frameImageSrc
         let compositeWidth, compositeHeight;
         
         if (mode === 'frame-size') {
-          // Use frame dimensions as canvas size
-          canvasWidth = frameImg.width;
-          canvasHeight = frameImg.height;
+          // Use frame dimensions as canvas size, plus extra frame dimensions
+          canvasWidth = frameImg.width + extraWidthPx;
+          canvasHeight = frameImg.height + extraHeightPx;
           
           // Scale composite to fit within frame while maintaining aspect ratio
           const compositeAspect = compositeImg.width / compositeImg.height;
           const frameAspect = frameImg.width / frameImg.height;
           
           if (compositeAspect > frameAspect) {
-            // Composite is wider - fit to width
-            compositeWidth = canvasWidth;
-            compositeHeight = canvasWidth / compositeAspect;
+            // Composite is wider - fit to width (use original frame width, not canvas width)
+            compositeWidth = frameImg.width;
+            compositeHeight = frameImg.width / compositeAspect;
           } else {
-            // Composite is taller - fit to height
-            compositeHeight = canvasHeight;
-            compositeWidth = canvasHeight * compositeAspect;
+            // Composite is taller - fit to height (use original frame height, not canvas height)
+            compositeHeight = frameImg.height;
+            compositeWidth = frameImg.height * compositeAspect;
           }
           
-          // Center composite based on alignment
+          // Center composite based on alignment, accounting for extra dimensions
           if (alignment === 'center') {
             compositeX = (canvasWidth - compositeWidth) / 2;
             compositeY = (canvasHeight - compositeHeight) / 2;
           } else if (alignment === 'top-left') {
-            compositeX = 0;
-            compositeY = 0;
+            compositeX = extraWidthPx / 2;
+            compositeY = extraHeightPx / 2;
           } else if (alignment === 'top-center') {
             compositeX = (canvasWidth - compositeWidth) / 2;
-            compositeY = 0;
+            compositeY = extraHeightPx / 2;
           } else if (alignment === 'center-left') {
-            compositeX = 0;
+            compositeX = extraWidthPx / 2;
             compositeY = (canvasHeight - compositeHeight) / 2;
           }
         } else {
-          // Use composite dimensions as canvas size
-          canvasWidth = compositeImg.width;
-          canvasHeight = compositeImg.height;
-          compositeWidth = canvasWidth;
-          compositeHeight = canvasHeight;
-          compositeX = 0;
-          compositeY = 0;
+          // Use composite dimensions as canvas size, plus extra frame dimensions
+          canvasWidth = compositeImg.width + extraWidthPx;
+          canvasHeight = compositeImg.height + extraHeightPx;
+          compositeWidth = compositeImg.width;
+          compositeHeight = compositeImg.height;
           
-          // Scale frame to match composite size
-          // (This mode assumes frame should cover the entire composite)
+          // Center the composite within the larger canvas
+          compositeX = extraWidthPx / 2;
+          compositeY = extraHeightPx / 2;
+          
+          // Scale frame to match the larger canvas size (including extra dimensions)
+          // (This mode assumes frame should cover the entire canvas including extra space)
         }
         
         // Create canvas
@@ -153,10 +162,10 @@ export async function applyFrameToComposite(compositeImageDataUrl, frameImageSrc
         
         // Draw frame PNG overlay on top (preserves transparency)
         if (mode === 'frame-size') {
-          // Draw frame at full size
+          // Draw frame scaled to the larger canvas size (including extra dimensions)
           ctx.drawImage(frameImg, 0, 0, canvasWidth, canvasHeight);
         } else {
-          // Scale frame to match composite size
+          // Scale frame to match the larger canvas size (including extra dimensions)
           ctx.drawImage(frameImg, 0, 0, canvasWidth, canvasHeight);
         }
         
