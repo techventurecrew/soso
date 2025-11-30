@@ -40,9 +40,13 @@ export default class CameraPipeline {
     this.video = resolveElement(videoEl, 'video element');
     this.canvas = resolveElement(outputCanvas, 'canvas element');
 
-    this.displayCtx = this.canvas.getContext('2d');
+    this.displayCtx = this.canvas.getContext('2d', { willReadFrequently: false });
     this.offscreen = document.createElement('canvas');
-    this.offscreenCtx = this.offscreen.getContext('2d');
+    this.offscreenCtx = this.offscreen.getContext('2d', { willReadFrequently: false });
+    
+    // Performance optimizations
+    this.displayCtx.imageSmoothingEnabled = true;
+    this.offscreenCtx.imageSmoothingEnabled = true;
 
     this.adjustments = { ...DEFAULT_ADJUSTMENTS, ...adjustments };
     this.filter = defaultFilter;
@@ -52,8 +56,10 @@ export default class CameraPipeline {
     this.enableFaceDetection = enableFaceDetection;
     this.modelsLoaded = false;
     this._rafId = null;
+    this._vfcId = null; // Video frame callback ID
     this._onFrame = this._onFrame.bind(this);
     this._detecting = false;
+    this._useVideoFrameCallback = typeof HTMLVideoElement.prototype.requestVideoFrameCallback === 'function';
     this.frameCount = 0;
     this.detectionStride = 6;
     this.lastDetection = null;
@@ -103,7 +109,13 @@ export default class CameraPipeline {
     this._syncCanvasSize();
 
     this.running = true;
-    this._rafId = requestAnimationFrame(this._onFrame);
+    
+    // Use requestVideoFrameCallback if available (more efficient for video)
+    if (this._useVideoFrameCallback) {
+      this._scheduleNextFrame();
+    } else {
+      this._rafId = requestAnimationFrame(this._onFrame);
+    }
   }
 
   stop() {
@@ -111,6 +123,10 @@ export default class CameraPipeline {
     if (this._rafId) {
       cancelAnimationFrame(this._rafId);
       this._rafId = null;
+    }
+    if (this._vfcId && this.video && typeof this.video.cancelVideoFrameCallback === 'function') {
+      this.video.cancelVideoFrameCallback(this._vfcId);
+      this._vfcId = null;
     }
     if (this.stream) {
       this.stream.getTracks().forEach((track) => track.stop());
@@ -233,13 +249,22 @@ export default class CameraPipeline {
     ctx.putImageData(imageData, 0, 0);
   }
 
+  _scheduleNextFrame() {
+    if (!this.running || !this.video) return;
+    if (this._useVideoFrameCallback) {
+      this._vfcId = this.video.requestVideoFrameCallback(this._onFrame);
+    } else {
+      this._rafId = requestAnimationFrame(this._onFrame);
+    }
+  }
+
   _onFrame() {
     if (!this.running) {
       return;
     }
 
     if (!this.video.videoWidth || !this.video.videoHeight) {
-      this._rafId = requestAnimationFrame(this._onFrame);
+      this._scheduleNextFrame();
       return;
     }
 
@@ -267,7 +292,7 @@ export default class CameraPipeline {
       this._scheduleDetection();
     }
 
-    this._rafId = requestAnimationFrame(this._onFrame);
+    this._scheduleNextFrame();
   }
 }
 

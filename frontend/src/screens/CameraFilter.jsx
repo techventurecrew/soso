@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FallingHearts } from '../components/Decoration';
 import CameraPipeline from '../pipeline/cameraPipeline';
-import { filterOptions } from '../filters/main';
+import { filterOptions, applyFilter } from '../filters/main';
 import './CameraFilter.css'; // Add this import for custom fonts
 
 function CameraFilter({ sessionData = {}, updateSession }) {
@@ -14,6 +14,10 @@ function CameraFilter({ sessionData = {}, updateSession }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const pipelineRef = useRef(null);
+  const previewCanvasRefs = useRef({});
+  const previewRafId = useRef(null);
+  const tempCanvasRef = useRef(null);
+  const filterCanvasRefs = useRef({});
 
   useEffect(() => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -52,6 +56,120 @@ function CameraFilter({ sessionData = {}, updateSession }) {
   useEffect(() => {
     pipelineRef.current?.setAdjustments({ brightness: brightness / 100 });
   }, [brightness]);
+
+  // Create temporary canvas for filter preview processing
+  useEffect(() => {
+    if (!tempCanvasRef.current) {
+      tempCanvasRef.current = document.createElement('canvas');
+    }
+  }, []);
+
+  // Update filter preview thumbnails (throttled for performance)
+  useEffect(() => {
+    if (!pipelineReady || !videoRef.current || !tempCanvasRef.current) {
+      return;
+    }
+
+    const video = videoRef.current;
+    const tempCanvas = tempCanvasRef.current;
+    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: false });
+    
+    // Performance optimizations
+    tempCtx.imageSmoothingEnabled = false;
+
+    // Throttle preview updates: update every 3 frames (~20fps instead of 60fps)
+    let frameSkip = 0;
+    const FRAME_SKIP = 3;
+    
+    // Use lower resolution for preview processing to improve performance
+    const PREVIEW_PROCESS_WIDTH = 320;
+    const PREVIEW_PROCESS_HEIGHT = 240;
+
+    const updatePreviews = () => {
+      if (!video.videoWidth || !video.videoHeight) {
+        previewRafId.current = requestAnimationFrame(updatePreviews);
+        return;
+      }
+
+      frameSkip++;
+      
+      // Only update previews every N frames
+      if (frameSkip < FRAME_SKIP) {
+        previewRafId.current = requestAnimationFrame(updatePreviews);
+        return;
+      }
+      frameSkip = 0;
+
+      // Use lower resolution for processing (faster)
+      if (tempCanvas.width !== PREVIEW_PROCESS_WIDTH || tempCanvas.height !== PREVIEW_PROCESS_HEIGHT) {
+        tempCanvas.width = PREVIEW_PROCESS_WIDTH;
+        tempCanvas.height = PREVIEW_PROCESS_HEIGHT;
+      }
+
+      // Draw video frame to temp canvas with brightness adjustment (scaled down for performance)
+      const filterString = `brightness(${brightness / 100})`;
+      tempCtx.filter = filterString;
+      tempCtx.drawImage(video, 0, 0, PREVIEW_PROCESS_WIDTH, PREVIEW_PROCESS_HEIGHT);
+      tempCtx.filter = 'none';
+
+      // Update each filter preview
+      filterOptions.forEach(({ id }) => {
+        const previewCanvas = previewCanvasRefs.current[id];
+        if (!previewCanvas) return;
+
+        // Get or create filter canvas for this filter (reuse for performance)
+        let filterCanvas = filterCanvasRefs.current[id];
+        if (!filterCanvas) {
+          filterCanvas = document.createElement('canvas');
+          filterCanvasRefs.current[id] = filterCanvas;
+        }
+
+        // Use same low resolution for filter processing
+        if (filterCanvas.width !== PREVIEW_PROCESS_WIDTH || filterCanvas.height !== PREVIEW_PROCESS_HEIGHT) {
+          filterCanvas.width = PREVIEW_PROCESS_WIDTH;
+          filterCanvas.height = PREVIEW_PROCESS_HEIGHT;
+        }
+
+        const filterCtx = filterCanvas.getContext('2d', { willReadFrequently: false });
+        filterCtx.imageSmoothingEnabled = false;
+        filterCtx.drawImage(tempCanvas, 0, 0);
+
+        // Apply the filter
+        try {
+          applyFilter(id, filterCanvas, null);
+        } catch (error) {
+          console.warn(`Filter ${id} preview failed`, error);
+        }
+
+        // Draw to preview canvas (scaled down)
+        const previewCtx = previewCanvas.getContext('2d', { willReadFrequently: false });
+        previewCtx.imageSmoothingEnabled = true; // Enable smoothing for final display
+        const previewWidth = previewCanvas.width;
+        const previewHeight = previewCanvas.height;
+        previewCtx.clearRect(0, 0, previewWidth, previewHeight);
+        previewCtx.drawImage(filterCanvas, 0, 0, previewWidth, previewHeight);
+      });
+
+      previewRafId.current = requestAnimationFrame(updatePreviews);
+    };
+
+    previewRafId.current = requestAnimationFrame(updatePreviews);
+
+    return () => {
+      if (previewRafId.current) {
+        cancelAnimationFrame(previewRafId.current);
+        previewRafId.current = null;
+      }
+      // Clean up filter canvas refs
+      Object.values(filterCanvasRefs.current).forEach(canvas => {
+        if (canvas) {
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+      });
+      filterCanvasRefs.current = {};
+    };
+  }, [pipelineReady, brightness]);
 
   const apply = () => {
     updateSession({ cameraFilter: filter, brightness });
@@ -147,8 +265,24 @@ function CameraFilter({ sessionData = {}, updateSession }) {
                   }`}
                   style={{ fontFamily: "'Poppins', sans-serif" }}
                 >
-                  <div className="w-full h-16 bg-gray-900 rounded-lg mb-2 flex items-center justify-center text-white text-xs">
-                    Live preview
+                  <div className="w-full h-16 rounded-lg mb-2 overflow-hidden relative bg-gray-900">
+                    <canvas
+                      ref={(el) => {
+                        if (el) {
+                          previewCanvasRefs.current[id] = el;
+                          // Set canvas size for preview (small thumbnail)
+                          el.width = 200;
+                          el.height = 120;
+                        }
+                      }}
+                      className="w-full h-full object-cover"
+                      style={{ display: 'block' }}
+                    />
+                    {!pipelineReady && (
+                      <div className="absolute inset-0 flex items-center justify-center text-white text-xs">
+                        Loading...
+                      </div>
+                    )}
                   </div>
                   <div className="text-xs font-semibold">{label}</div>
                 </button>
