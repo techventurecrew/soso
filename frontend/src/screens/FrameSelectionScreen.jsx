@@ -18,15 +18,15 @@ function FrameSelectionScreen({ sessionData, updateSession }) {
         const loadFrameOptions = async () => {
             try {
                 const loadedFrames = await loadFrames();
-                
+
                 // Add "No Frame" option at the beginning
                 const framesWithNone = [
                     { id: 'none', name: 'No Frame', src: null, isNone: true },
                     ...loadedFrames
                 ];
-                
+
                 setFrames(framesWithNone);
-                
+
                 // Load previews for all frames (skip "none")
                 const previews = {};
                 for (const frame of loadedFrames) {
@@ -43,7 +43,7 @@ function FrameSelectionScreen({ sessionData, updateSession }) {
                 console.error('Error loading frames:', error);
             }
         };
-        
+
         loadFrameOptions();
     }, []);
 
@@ -55,7 +55,7 @@ function FrameSelectionScreen({ sessionData, updateSession }) {
                     // Check if this is a strip-grid
                     const grid = sessionData?.selectedGrid;
                     const isStripGrid = grid && (grid.id === 'strip-grid' || grid.isStripGrid);
-                    
+
                     let preview;
                     if (isStripGrid) {
                         if (selectedFrame.isNone) {
@@ -89,7 +89,7 @@ function FrameSelectionScreen({ sessionData, updateSession }) {
                     setPreviewImage(null);
                 }
             };
-            
+
             generatePreview();
         } else {
             setPreviewImage(null);
@@ -108,7 +108,7 @@ function FrameSelectionScreen({ sessionData, updateSession }) {
 
         try {
             let framedImage;
-            
+
             // If "No Frame" is selected, use original composite
             if (selectedFrame.isNone) {
                 framedImage = compositeImage;
@@ -116,7 +116,7 @@ function FrameSelectionScreen({ sessionData, updateSession }) {
                 // Check if this is a strip-grid
                 const grid = sessionData?.selectedGrid;
                 const isStripGrid = grid && (grid.id === 'strip-grid' || grid.isStripGrid);
-                
+
                 if (isStripGrid) {
                     // Apply frame only to the 2×6 strip, then duplicate
                     framedImage = await applyFrameToStripGrid(
@@ -187,9 +187,9 @@ function FrameSelectionScreen({ sessionData, updateSession }) {
                             <img
                                 src={previewImage}
                                 alt="Frame Preview"
-                                style={{ 
-                                    display: 'block', 
-                                    width: '100%', 
+                                style={{
+                                    display: 'block',
+                                    width: '100%',
                                     height: 'auto',
                                     maxWidth: '100%',
                                     maxHeight: '100%',
@@ -208,14 +208,14 @@ function FrameSelectionScreen({ sessionData, updateSession }) {
                     </div>
 
                     <div className="mt-4 flex gap-2 flex-shrink-0">
-                        <button
+                        {/* <button
                             onClick={() => navigate('/camera')}
                             className="flex-1 text-sm py-2 px-3 rounded-lg border-2 hover:bg-gray-100 font-semibold"
                             style={{ fontFamily: "'Poppins', sans-serif" }}
                             disabled={isProcessing}
                         >
                             ← Back
-                        </button>
+                        </button> */}
                         <button
                             onClick={handleContinue}
                             style={{
