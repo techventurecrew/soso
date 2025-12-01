@@ -19,7 +19,7 @@ function StickerEditorScreen({ sessionData, updateSession }) {
     useEffect(() => {
         const grid = sessionData?.selectedGrid;
         const isStripGrid = grid && (grid.id === 'strip-grid' || grid.isStripGrid);
-        
+
         if (isStripGrid && compositeImage) {
             extractStripFromComposite(compositeImage, 300)
                 .then(stripImage => {
@@ -37,24 +37,55 @@ function StickerEditorScreen({ sessionData, updateSession }) {
     // Sticker library - replace these URLs with your actual sticker image paths
     const stickerLibrary = [
         {
-            id: 'heart', url: '/images/stick1.png', name: 'Heart'
+            id: 'heart', url: '/images/stick1.png', name: 'panda'
         },
-        { id: 'star', url: '/images/stick2.png', name: 'Star' },
-        { id: 'smile', url: '/images/stick3.png', name: 'Smile' },
-        { id: 'flower', url: '/images/stick4.png', name: 'Flower' },
-        { id: 'balloon', url: '/images/stick5.png', name: 'Balloon' },
-        { id: 'confetti', url: '/images/stick6.png', name: 'Confetti' },
-        { id: 'butterfly', url: '/images/stick7.png', name: 'Butterfly' },
-        { id: 'music', url: '/images/stick8.png', name: 'Music' },
-        { id: 'crown', url: '/images/stick9.png', name: 'Crown' },
-        { id: 'sparkle', url: '/images/stick10.png', name: 'Sparkle' },
-        { id: 'peace', url: '/images/stick11.png', name: 'Peace' },
-        { id: 'rainbow', url: '/images/stick12.png', name: 'Rainbow' },
-        { id: 'music', url: '/images/stick13.png', name: 'Music' },
-        { id: 'crown', url: '/images/stick14.png', name: 'Crown' },
+        { id: 'star', url: '/images/stick2.png', name: 'cats' },
+        { id: 'smile', url: '/images/stick3.png', name: 'birthday' },
+        { id: 'flower', url: '/images/stick4.png', name: 'cat' },
+        { id: 'balloon', url: '/images/stick5.png', name: 'couple' },
+        { id: 'confetti', url: '/images/stick6.png', name: 'cat' },
+        { id: 'butterfly', url: '/images/stick7.png', name: 'couple' },
+        { id: 'music', url: '/images/stick8.png', name: 'teddy' },
+        { id: 'crown', url: '/images/stick9.png', name: 'rabbit' },
+        { id: 'sparkle', url: '/images/stick10.png', name: 'rabbit' },
+        { id: 'peace', url: '/images/stick11.png', name: 'couple' },
+        { id: 'rainbow', url: '/images/stick12.png', name: 'teddy' },
+        { id: 'music', url: '/images/stick13.png', name: 'candy' },
+        { id: 'crown', url: '/images/stick14.png', name: 'teddy' },
         { id: 'sparkle', url: '/images/stick15.png', name: 'Sparkle' },
         { id: 'peace', url: '/images/stick16.png', name: 'Peace' },
-        { id: 'rainbow', url: '/images/stick17.png', name: 'Rainbow' }
+        { id: 'rainbow', url: '/images/stick17.png', name: 'teedy' },
+        { id: 'rainbow', url: '/images/stick18.png', name: 'christmas' },
+        { id: 'rainbow', url: '/images/stick19.png', name: 'besties' },
+        { id: 'rainbow', url: '/images/stick20.png', name: 'christmas' },
+        { id: 'rainbow', url: '/images/stick21.png', name: 'happy birthday' },
+        { id: 'rainbow', url: '/images/stick22.png', name: 'new year' },
+        { id: 'rainbow', url: '/images/stick23.png', name: 'new year' },
+        { id: 'rainbow', url: '/images/stick24.png', name: 'santa' },
+        { id: 'rainbow', url: '/images/stick25.png', name: 'party' },
+        { id: 'rainbow', url: '/images/stick26.png', name: 'party' },
+        { id: 'rainbow', url: '/images/stick27.png', name: 'teddy' },
+        { id: 'rainbow', url: '/images/stick28.png', name: 'new year' },
+        { id: 'rainbow', url: '/images/stick29.png', name: 'birthday' },
+        { id: 'rainbow', url: '/images/stick30.png', name: 'miss you' },
+        { id: 'rainbow', url: '/images/stick31.png', name: 'birthday' },
+        { id: 'rainbow', url: '/images/stick32.png', name: 'eat' },
+        { id: 'rainbow', url: '/images/stick33.png', name: 'best friend' },
+        { id: 'rainbow', url: '/images/stick34.png', name: 'party' },
+        { id: 'rainbow', url: '/images/stick35.png', name: 'couple' },
+        { id: 'rainbow', url: '/images/stick36.png', name: 'teddy' },
+        { id: 'rainbow', url: '/images/stick37.png', name: 'best friend' },
+        { id: 'rainbow', url: '/images/stick38.png', name: 'birthday' },
+        { id: 'rainbow', url: '/images/stick39.png', name: 'beer' },
+        { id: 'rainbow', url: '/images/stick40.png', name: 'new year' },
+        { id: 'rainbow', url: '/images/stick42.png', name: 'teddy' },
+        { id: 'rainbow', url: '/images/stick43.png', name: 'panda' },
+        { id: 'rainbow', url: '/images/stick44.png', name: 'Rainbow' },
+        { id: 'rainbow', url: '/images/stick45.png', name: 'besties' },
+        { id: 'rainbow', url: '/images/stick46.png', name: 'panda' },
+        { id: 'rainbow', url: '/images/stick47.png', name: 'birthday' },
+        { id: 'rainbow', url: '/images/stick48.png', name: 'birthday' },
+        { id: 'rainbow', url: '/images/stick49.png', name: 'birthday' },
     ];
 
     const addSticker = (stickerData) => {
